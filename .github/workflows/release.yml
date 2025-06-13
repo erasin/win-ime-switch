@@ -9,7 +9,7 @@ on:
     - ci-release-*
 
 env:
-  BIN_NAME: win-ime-swiitch
+  BIN_NAME: win-ime-switch
 jobs:
   build:
     name: Build (${{ matrix.target }})
