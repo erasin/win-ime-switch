@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags:
+    - '[0-9]+.[0-9]+'
+    - '[0-9]+.[0-9]+.[0-9]+'
+    branches:
+    - ci-release-*
+
+env:
+  BIN_NAME: win-ime-swiitch
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [x86_64-windows]
+        include:
+          - build: x86_64-windows
+            os: windows-latest
+            rust: stable
+            target: x86_64-pc-windows-msvc
+            cross: false
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install ${{ matrix.rust }} toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target }}
+
+      - name: Cargo build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Build archive
+        shell: bash
+        run: |
+          mkdir -p dist
+          echo "os: ${{ matrix.os }}";
+          echo "target: ${{ matrix.target }}";
+          echo "name: ${{ env.BIN_NAME }}";
+
+          if [ "${{ matrix.os }}" = "windows-2019" ]; then
+            cp "target/${{ matrix.target }}/release/${{ env.BIN_NAME }}.exe" "dist/"
+          else
+            cp "target/${{ matrix.target }}/release/${{ env.BIN_NAME }}" "dist/"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bins-${{ matrix.build }}
+          path: dist
+
+  create-release:
+    name: Create Release
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: build archive
+        shell: bash
+        run: |
+          set -ex
+          source="$(pwd)"
+          tag=${GITHUB_REF_NAME//\//}
+          bin_name="${{ env.BIN_NAME }}"
+  
+          cd "$(mktemp -d)"
+          mv $source/bins-* .
+          mkdir dist
+
+          for dir in bins-* ; do
+              platform=${dir#"bins-"}
+              if [[ $platform =~ "windows" ]]; then
+                  exe=".exe"
+              fi
+              pkgname=$bin_name-$tag-$platform
+              mkdir -p $pkgname
+              cp $source/LICENSE $source/README.md $pkgname
+              mv bins-$platform/$bin_name$exe $pkgname
+              chmod +x $pkgname/$bin_name$exe
+
+              if [ "$exe" = "" ]; then
+                  tar cJf dist/$pkgname.tar.xz $pkgname
+              else
+                  7z a -r dist/$pkgname.zip $pkgname
+              fi
+          done
+
+          tar cJf dist/$bin_name-$tag-source.tar.xz -C $source .
+          mv dist $source/
+
+      - name: create release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: dist/*
+          
+      - name: Upload binaries as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: dist/*
