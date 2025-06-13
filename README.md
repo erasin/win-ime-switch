@@ -31,3 +31,7 @@ win-ime-switch
     --toggle  - 切换回上一个输入法 (保留内部状态)
     --current - 显示当前输入法
     --list    - 显示已启用的输入法
+
+## linux
+
+在 [helix 输入法切换](https://github.com/erasin/helix-config?tab=readme-ov-file#%E8%BE%93%E5%85%A5%E6%B3%95%E5%88%87%E6%8D%A2) 中提供了脚本 [ime-switch](https://github.com/erasin/helix-config/blob/main/scripts/ime-switch) 里面提供了 linux/macos 的输入法切换方案。
